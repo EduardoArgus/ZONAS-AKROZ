@@ -1,8 +1,6 @@
----
 
-**README.md (Versão Detalhada)**
+**README (Versão Detalhada)**
 
-```markdown
 # 📍 Automação e Inteligência de Cercas VIRLOC - Documentação Técnica
 
 Este repositório contém o sistema completo de automação logística para rastreadores VIRLOC. O dashboard foi construído com Streamlit e elimina o trabalho manual de formatação de coordenadas, prevenindo falhas de roteirização através de cálculos de geometria espacial.
