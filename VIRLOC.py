@@ -41,7 +41,6 @@ def gerar_script_virloc(nome_cerca, coordenadas, indice_inicial=50, prioridade="
         lat_fmt = formatar_coordenada(lat)
         lon_fmt = formatar_coordenada(lon, True)
         tipo_ponto = "E" if i == len(coordenadas) - 1 else "P"
-        # Ajustado para 2 dígitos (02d) no índice VSRN
         linhas_virloc.append(f"VSRN{indice_inicial+i:02d},{lat_fmt},{lon_fmt},0,0,{tipo_ponto},{velocidade},360,{prioridade}")
         
     return "\n".join(linhas_virloc)
@@ -116,14 +115,14 @@ with aba1:
                         st.markdown(alerta)
             
             dados_tabela = []
-            indice_global = 1
+            indice_global = 50 # <-- ALTERADO PARA COMEÇAR EM 50
             for cerca in cercas:
                 dados_tabela.append({
                     "Nome da Cerca": cerca['nome'],
                     "Velocidade Limite": extrair_velocidade(cerca['nome']),
                     "Prioridade": "08",
                     "Total de Vértices": len(cerca['coordenadas']),
-                    "Índice VIRLOC Inicial": f"VSRN{indice_global:02d}" # Ajustado para 2 dígitos
+                    "Índice VIRLOC Inicial": f"VSRN{indice_global:02d}"
                 })
                 indice_global += len(cerca['coordenadas']) + 2 
             
@@ -137,7 +136,7 @@ with aba1:
                 df_editado = st.data_editor(df_export, use_container_width=True)
                 
                 scripts_finais = []
-                indice_recalculo = 1
+                indice_recalculo = 50 # <-- ALTERADO PARA COMEÇAR EM 50
                 
                 for index, row in df_editado.iterrows():
                     cerca_atual = cercas[index]
@@ -184,14 +183,13 @@ with aba2:
     st.markdown("Busque a região de operação e desenhe polígonos livremente.")
     renderizar_legenda()
     
-    # Criando colunas para agrupar a barra de pesquisa e o Toggle Button
     col_busca, col_toggle = st.columns([2, 1])
     
     with col_busca:
         cidade_busca = st.text_input("🔍 Pesquisar Região", "")
         
     with col_toggle:
-        st.write("") # Espaçamento para alinhar com o campo de texto
+        st.write("") 
         st.write("")
         mostrar_fantasma = st.toggle("👻 Ativar Camadas Fantasmas", value=True)
         
@@ -217,7 +215,6 @@ with aba2:
         folium.TileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', attr='Google', name='Google Híbrido', max_zoom=20).add_to(mapa_desenho)
         folium.LayerControl().add_to(mapa_desenho)
         
-        # INJEÇÃO DAS CAMADAS FANTASMAS COM BOTÃO DE CONTROLE
         if st.session_state.cercas_kml and mostrar_fantasma:
             st.info("Usando referências do KML como molde para desenho.")
             for cerca in st.session_state.cercas_kml:
@@ -246,7 +243,7 @@ with aba2:
         
         if dados_mapa and dados_mapa.get("all_drawings"):
             scripts_desenhados = []
-            indice_desenho = 1
+            indice_desenho = 50 # <-- ALTERADO PARA COMEÇAR EM 50
             
             for i, desenho in enumerate(dados_mapa["all_drawings"]):
                 if desenho["geometry"]["type"] == "Polygon":
