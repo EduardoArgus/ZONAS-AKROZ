@@ -33,7 +33,7 @@ def obter_cor_prioridade(prio_str):
     except:
         return "#0052cc"
 
-def gerar_script_virloc(nome_cerca, coordenadas, indice_inicial=1, prioridade="08", velocidade_override=None):
+def gerar_script_virloc(nome_cerca, coordenadas, indice_inicial=50, prioridade="08", velocidade_override=None):
     velocidade = velocidade_override if velocidade_override else extrair_velocidade(nome_cerca)
     linhas_virloc = []
     
