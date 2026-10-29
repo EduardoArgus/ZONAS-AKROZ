@@ -33,7 +33,7 @@ def obter_cor_prioridade(prio_str):
     except:
         return "#0052cc"
 
-def gerar_script_virloc(nome_cerca, coordenadas, indice_inicial=50, prioridade="08", velocidade_override=None):
+def gerar_script_virloc(nome_cerca, coordenadas, indice_inicial=160, prioridade="08", velocidade_override=None):
     velocidade = velocidade_override if velocidade_override else extrair_velocidade(nome_cerca)
     linhas_virloc = []
     
@@ -41,7 +41,7 @@ def gerar_script_virloc(nome_cerca, coordenadas, indice_inicial=50, prioridade="
         lat_fmt = formatar_coordenada(lat)
         lon_fmt = formatar_coordenada(lon, True)
         tipo_ponto = "E" if i == len(coordenadas) - 1 else "P"
-        linhas_virloc.append(f"VSRN{indice_inicial+i:02d},{lat_fmt},{lon_fmt},0,0,{tipo_ponto},{velocidade},360,{prioridade}")
+        linhas_virloc.append(f"VSRN{indice_inicial+i:03d},{lat_fmt},{lon_fmt},0,0,{tipo_ponto},{velocidade},360,{prioridade}")
         
     return "\n".join(linhas_virloc)
 
@@ -177,14 +177,14 @@ with aba1:
             alertas_iniciais, prioridades_auto = auditar_e_definir_prioridades(cercas)
             
             dados_tabela = []
-            indice_global = 50
+            indice_global = 160
             for idx, cerca in enumerate(cercas):
                 dados_tabela.append({
                     "Nome da Cerca": cerca['nome'],
                     "Velocidade Limite": extrair_velocidade(cerca['nome']),
                     "Prioridade": prioridades_auto[idx],
                     "Total de Vértices": len(cerca['coordenadas']),
-                    "Índice VIRLOC Inicial": f"VSRN{indice_global:02d}"
+                    "Índice VIRLOC Inicial": f"VSRN{indice_global:03d}"
                 })
                 indice_global += len(cerca['coordenadas']) + 1 
             
@@ -202,7 +202,7 @@ with aba1:
                 alertas_atuais, prioridades_recalculadas = auditar_e_definir_prioridades(cercas, velocidades_atuais)
                 
                 scripts_finais = []
-                primeiro_ponto = 50
+                primeiro_ponto = 160
                 indice_recalculo = primeiro_ponto
                 ultimo_ponto = primeiro_ponto
                 
@@ -357,7 +357,7 @@ with aba2:
                         st.markdown(alerta)
                 
                 scripts_desenhados = []
-                primeiro_ponto_des = 50
+                primeiro_ponto_des = 160
                 indice_desenho = primeiro_ponto_des
                 ultimo_ponto_des = primeiro_ponto_des
                 
