@@ -70,11 +70,13 @@ def extrair_coordenadas_kml(kml_string):
         cercas.append({'nome': nome_elem.text, 'coordenadas': coordenadas})
     return cercas
 
+def calcular_centroide(coordenadas):
+    if len(coordenadas) >= 3:
+        poly = ShapelyPolygon(coordenadas)
+        return poly.centroid.y, poly.centroid.x
+    return coordenadas[0][1], coordenadas[0][0]
+
 def auditar_e_definir_prioridades(cercas, velocidades_custom=None):
-    """
-    Detecta sobreposições espaciais e atribui maior prioridade (menor número, 00 a 15)
-    para as zonas de MENOR velocidade.
-    """
     n = len(cercas)
     prioridades = ["08"] * n
     alertas = []
@@ -90,7 +92,6 @@ def auditar_e_definir_prioridades(cercas, velocidades_custom=None):
         poly = ShapelyPolygon(cercas[i]['coordenadas']) if len(cerca['coordenadas']) >= 3 else None
         poligonos.append({'idx': i, 'nome': cerca['nome'], 'poly': poly, 'vel': vel_num})
     
-    # Grafo de adjacência para agrupar cercas que se sobrepõem
     adj = {i: set() for i in range(n)}
     pares_conflito = []
     
@@ -102,7 +103,6 @@ def auditar_e_definir_prioridades(cercas, velocidades_custom=None):
                 adj[j].add(i)
                 pares_conflito.append((i, j))
                 
-    # Calcula prioridades por grupo de sobreposição (menor velocidade = mais próximo de 00)
     visitados = set()
     for i in range(n):
         if i not in visitados and adj[i]:
@@ -117,8 +117,6 @@ def auditar_e_definir_prioridades(cercas, velocidades_custom=None):
                         visitados.add(viz)
                         fila.append(viz)
             
-            # Ordena em ordem decrescente: maior velocidade fica no rank 0 (Prio 08),
-            # e velocidades menores avançam de rank recebendo números menores (mais próximos de 00)
             vels_unicas = sorted(list(set(poligonos[idx]['vel'] for idx in grupo)), reverse=True)
             if len(vels_unicas) > 1:
                 passo = max(1, 7 // (len(vels_unicas) - 1))
@@ -127,7 +125,6 @@ def auditar_e_definir_prioridades(cercas, velocidades_custom=None):
                     prio_calculada = max(0, 8 - (rank * passo))
                     prioridades[idx] = f"{prio_calculada:02d}"
                     
-    # Gera os alertas detalhando a resolução automática
     for i, j in pares_conflito:
         p1, p2 = poligonos[i], poligonos[j]
         if p1['vel'] != p2['vel']:
@@ -136,12 +133,10 @@ def auditar_e_definir_prioridades(cercas, velocidades_custom=None):
             prio_menor = prioridades[menor['idx']]
             prio_maior = prioridades[maior['idx']]
             alertas.append(
-                f"⚠️ **Conflito Resolvido Automaticamente:** '{menor['nome']}' ({menor['vel']}km/h) sobrepõe "
-                f"'{maior['nome']}' ({maior['vel']}km/h). Maior prioridade aplicada à menor velocidade "
+                f"⚠️ **Conflito Resolvido:** '{menor['nome']}' ({menor['vel']}km/h) sobrepõe "
+                f"'{maior['nome']}' ({maior['vel']}km/h). Maior prioridade na menor velocidade "
                 f"(**Prio {prio_menor}** vs **Prio {prio_maior}**)."
             )
-        else:
-            alertas.append(f"ℹ️ **Sobreposição de Mesma Velocidade:** '{p1['nome']}' e '{p2['nome']}' ({p1['vel']}km/h).")
             
     return alertas, prioridades
 
@@ -180,24 +175,23 @@ with aba1:
             indice_global = 160
             for idx, cerca in enumerate(cercas):
                 dados_tabela.append({
+                    "Índice Inicial": f"VSRN{indice_global:03d}",
                     "Nome da Cerca": cerca['nome'],
                     "Velocidade Limite": extrair_velocidade(cerca['nome']),
                     "Prioridade": prioridades_auto[idx],
-                    "Total de Vértices": len(cerca['coordenadas']),
-                    "Índice VIRLOC Inicial": f"VSRN{indice_global:03d}"
+                    "Vértices": len(cerca['coordenadas'])
                 })
                 indice_global += len(cerca['coordenadas']) + 1 
             
-            col_mapa, col_dados = st.columns(2)
+            col_mapa, col_dados = st.columns([1.2, 1])
             
             with col_dados:
-                st.subheader("Edição de Metadados e Exportação")
-                st.markdown("Zonas sobrepostas recebem **maior prioridade automaticamente** na **menor velocidade**. Se alterar a velocidade na tabela, a prioridade de conflito é recalculada.")
+                st.subheader("Edição de Metadados")
+                st.markdown("Zonas sobrepostas recebem **maior prioridade automaticamente** na **menor velocidade**.")
                 
                 df_export = pd.DataFrame(dados_tabela)
-                df_editado = st.data_editor(df_export, use_container_width=True)
+                df_editado = st.data_editor(df_export, use_container_width=True, hide_index=True)
                 
-                # Recalcula prioridades caso o usuário tenha mudado velocidades na tabela
                 velocidades_atuais = [str(row["Velocidade Limite"]) for _, row in df_editado.iterrows()]
                 alertas_atuais, prioridades_recalculadas = auditar_e_definir_prioridades(cercas, velocidades_atuais)
                 
@@ -210,7 +204,6 @@ with aba1:
                     cerca_atual = cercas[index]
                     velocidade_formatada = str(row["Velocidade Limite"])
                     
-                    # Se o usuário alterou manualmente a prioridade na tabela, respeita a edição; senão usa a automática
                     prio_tabela = str(row["Prioridade"]).zfill(2)
                     if prio_tabela != prioridades_auto[index]:
                         prioridade_formatada = prio_tabela
@@ -229,7 +222,6 @@ with aba1:
                     ultimo_ponto = indice_recalculo + len(cerca_atual['coordenadas']) - 1
                     indice_recalculo += len(cerca_atual['coordenadas']) + 1
                 
-                # Adiciona o fechamento obrigatório da Região 00 ao final do script
                 scripts_finais.append(gerar_rodape_regiao(primeiro_ponto, ultimo_ponto))
                 texto_final = "\n\n".join(scripts_finais)
                 
@@ -240,21 +232,37 @@ with aba1:
                 with st.expander("Ver Script Completo"):
                     st.code(texto_final, language="text")
 
-            if alertas_atuais:
-                with st.expander("🚨 Alertas de Conflito Espacial e Prioridades", expanded=True):
-                    for alerta in alertas_atuais:
-                        st.markdown(alerta)
-
             with col_mapa:
+                # Sistema de Foco no Mapa
+                lista_nomes_cercas = [c['nome'] for c in cercas]
+                cerca_foco = st.selectbox("🎯 Centralizar mapa na cerca:", ["Visão Geral de Todas as Cercas"] + lista_nomes_cercas)
+                
+                if cerca_foco == "Visão Geral de Todas as Cercas":
+                    lat_foco, lon_foco = cercas[0]['coordenadas'][0][1], cercas[0]['coordenadas'][0][0]
+                    zoom_foco = 13
+                else:
+                    idx_foco = lista_nomes_cercas.index(cerca_foco)
+                    lat_foco, lon_foco = calcular_centroide(cercas[idx_foco]['coordenadas'])
+                    zoom_foco = 16 # Zoom aproximado para focar na cerca
+
                 st.subheader("Validação Geométrica")
                 renderizar_legenda()
                 
-                mapa_auditoria = folium.Map(location=[cercas[0]['coordenadas'][0][1], cercas[0]['coordenadas'][0][0]], zoom_start=13)
+                mapa_auditoria = folium.Map(location=[lat_foco, lon_foco], zoom_start=zoom_foco)
                 folium.TileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', attr='Google', name='Google Híbrido', max_zoom=20).add_to(mapa_auditoria)
                 folium.LayerControl().add_to(mapa_auditoria)
                 
+                # Sistema de Renderização por Área (As maiores por baixo, as menores por cima)
+                cercas_ordenadas = []
                 for index, row in df_editado.iterrows():
                     cerca_atual = cercas[index]
+                    area_poligono = ShapelyPolygon(cerca_atual['coordenadas']).area if len(cerca_atual['coordenadas']) >= 3 else 0
+                    cercas_ordenadas.append((area_poligono, index, row, cerca_atual))
+                
+                # Ordena a lista de forma decrescente (Maior área -> Menor área)
+                cercas_ordenadas.sort(key=lambda x: x[0], reverse=True)
+                
+                for area, index, row, cerca_atual in cercas_ordenadas:
                     pontos_folium = [(lat, lon) for lon, lat in cerca_atual['coordenadas']]
                     
                     prio_tabela = str(row["Prioridade"]).zfill(2)
@@ -266,10 +274,15 @@ with aba1:
                         tooltip=f"{cerca_atual['nome']} (Vel: {row['Velocidade Limite']}km/h | Prio: {prio_final})", 
                         color=cor_poligono, 
                         fill_color=cor_poligono, 
-                        fill_opacity=0.4
+                        fill_opacity=0.5
                     ).add_to(mapa_auditoria)
                     
                 folium_static(mapa_auditoria)
+                
+            if alertas_atuais:
+                with st.expander("🚨 Alertas de Conflito Espacial e Prioridades", expanded=True):
+                    for alerta in alertas_atuais:
+                        st.markdown(alerta)
     else:
         st.session_state.cercas_kml = [] 
 
@@ -303,7 +316,7 @@ with aba2:
         except:
             pass
     
-    col_mapa2, col_script2 = st.columns(2)
+    col_mapa2, col_script2 = st.columns([1.2, 1])
     
     with col_mapa2:
         mapa_desenho = folium.Map(location=[lat_inicial, lon_inicial], zoom_start=13)
@@ -312,7 +325,16 @@ with aba2:
         
         if st.session_state.cercas_kml and mostrar_fantasma:
             st.info("Usando referências do KML como molde para desenho.")
+            
+            # Aplica a mesma ordenação por área para as camadas fantasmas
+            fantasmas_ordenadas = []
             for cerca in st.session_state.cercas_kml:
+                area = ShapelyPolygon(cerca['coordenadas']).area if len(cerca['coordenadas']) >= 3 else 0
+                fantasmas_ordenadas.append((area, cerca))
+            
+            fantasmas_ordenadas.sort(key=lambda x: x[0], reverse=True)
+            
+            for area, cerca in fantasmas_ordenadas:
                 pontos_folium = [(lat, lon) for lon, lat in cerca['coordenadas']]
                 folium.Polygon(
                     pontos_folium,
@@ -331,7 +353,7 @@ with aba2:
             edit_options={'edit': True, 'remove': True}
         ).add_to(mapa_desenho)
         
-        dados_mapa = st_folium(mapa_desenho, width=600, height=500)
+        dados_mapa = st_folium(mapa_desenho, width=700, height=600)
         
     with col_script2:
         st.subheader("Roteiro Interativo")
@@ -375,3 +397,4 @@ with aba2:
                 st.code(texto_desenho, language="text")
         else:
             st.info("Aguardando interação no mapa. Use a ferramenta de polígono à esquerda para começar.")
+            
